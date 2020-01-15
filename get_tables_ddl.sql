@@ -17,8 +17,7 @@ SELECT
 					seq,
 					ddl
 				FROM (
-					--DROP TABLE
-					SELECT
+					(SELECT --DROP TABLE
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -27,10 +26,9 @@ SELECT
 						FROM pg_namespace AS n
 						INNER JOIN pg_class AS c 
 							ON n.oid = c.relnamespace
-						WHERE c.relkind = 'r'
-					--CREATE TABLE
+						WHERE c.relkind = 'r')
 					UNION 
-					SELECT
+					(SELECT --CREATE TABLE
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -39,10 +37,9 @@ SELECT
 						FROM pg_namespace AS n
 						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
-						WHERE c.relkind = 'r'
-					--OPEN PAREN COLUMN LIST
+						WHERE c.relkind = 'r')
 					UNION 
-					SELECT
+					(SELECT --OPEN PAREN COLUMN LIST
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -51,10 +48,9 @@ SELECT
 						FROM pg_namespace AS n
 						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
-						WHERE c.relkind = 'r'
-					--COLUMN LIST
+						WHERE c.relkind = 'r')
 					UNION 
-					SELECT
+					(SELECT --COLUMN LIST
 							tableowner,
 							schemaname,
 							tablename,
@@ -104,10 +100,9 @@ SELECT
 										AND a.attnum = adef.adnum
 								WHERE c.relkind = 'r'
 									AND a.attnum > 0
-								ORDER BY a.attnum)
-					--CONSTRAINT LIST
+								ORDER BY a.attnum))
 					UNION
-					SELECT
+					(SELECT --CONSTRAINT LIST
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -121,10 +116,9 @@ SELECT
 							ON n.oid = c.relnamespace
 						WHERE c.relkind = 'r'
 							AND pg_get_constraintdef(con.oid) NOT LIKE 'FOREIGN KEY%'
-						ORDER BY seq
-					--CLOSE PAREN COLUMN LIST
+						ORDER BY seq)
 					UNION 
-					SELECT
+					(SELECT --CLOSE PAREN COLUMN LIST
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -133,10 +127,9 @@ SELECT
 						FROM pg_namespace AS n
 						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
-						WHERE c.relkind = 'r'
-					--BACKUP
+						WHERE c.relkind = 'r')
 					UNION
-					SELECT
+					(SELECT --BACKUP
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -152,10 +145,9 @@ SELECT
 								WHERE key LIKE 'pg_class_backup_%'
 									AND SPLIT_PART(key,'_',4) = (SELECT oid FROM pg_database WHERE datname = current_database())) AS t 
 							ON t.id=c.oid
-						WHERE c.relkind = 'r'
-					--BACKUP WARNING
+						WHERE c.relkind = 'r')
 					UNION 
-					SELECT
+					(SELECT --BACKUP WARNING
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -171,10 +163,9 @@ SELECT
 								WHERE key LIKE 'pg_class_backup_%'
 									AND SPLIT_PART(key,'_',4) = (SELECT oid FROM pg_database WHERE datname = current_database())) AS t 
 							ON t.id=c.oid
-						WHERE c.relkind = 'r'
-					--DISTSTYLE
+						WHERE c.relkind = 'r')
 					UNION
-					SELECT
+					(SELECT --DISTSTYLE
 							c.relowner as tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -191,53 +182,51 @@ SELECT
 						FROM pg_namespace AS n
 						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
+						WHERE c.relkind = 'r')
+					UNION
+					(SELECT --DISTKEY COLUMNS
+							c.relowner AS tableowner,
+							n.nspname AS schemaname,
+							c.relname AS tablename,
+							400000000 + a.attnum AS seq,
+							'DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
+						FROM pg_namespace AS n
+						INNER JOIN pg_class AS c 
+							ON n.oid = c.relnamespace
+						INNER JOIN pg_attribute AS a 
+							ON c.oid = a.attrelid
 						WHERE c.relkind = 'r'
-					--DISTKEY COLUMNS
+							AND a.attisdistkey IS TRUE
+							AND a.attnum > 0)
 					UNION
-					SELECT
-						c.relowner AS tableowner,
-						n.nspname AS schemaname,
-						c.relname AS tablename,
-						400000000 + a.attnum AS seq,
-						'DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
-					FROM pg_namespace AS n
-					INNER JOIN pg_class AS c 
-						ON n.oid = c.relnamespace
-					INNER JOIN pg_attribute AS a 
-						ON c.oid = a.attrelid
-					WHERE c.relkind = 'r'
-						AND a.attisdistkey IS TRUE
-						AND a.attnum > 0
-					--SORTKEY COLUMNS 
+					(SELECT --SORTKEY COLUMNS 
+							tableowner,
+							schemaname,
+							tablename,
+							seq,
+							CASE 
+									WHEN min_sort < 0
+										THEN 'INTERLEAVED SORTKEY (' 
+									ELSE 'SORTKEY (' 
+								END AS ddl
+						FROM (
+							SELECT
+									c.relowner AS tableowner,
+									n.nspname AS schemaname,
+									c.relname AS tablename,
+									499999999 AS seq,
+									MIN(attsortkeyord) AS min_sort 
+								FROM pg_namespace AS n
+								INNER JOIN  pg_class AS c
+									ON n.oid = c.relnamespace
+								INNER JOIN pg_attribute AS a
+									ON c.oid = a.attrelid
+								WHERE c.relkind = 'r'
+									AND ABS(a.attsortkeyord) > 0
+									AND a.attnum > 0
+								GROUP BY tableowner, schemaname, tablename))
 					UNION
-					SELECT
-						tableowner,
-						schemaname,
-						tablename,
-						seq,
-						CASE 
-								WHEN min_sort < 0
-									THEN 'INTERLEAVED SORTKEY (' 
-								ELSE 'SORTKEY (' 
-							END AS ddl
-					FROM (
-						SELECT
-								c.relowner AS tableowner,
-								n.nspname AS schemaname,
-								c.relname AS tablename,
-								499999999 AS seq,
-								MIN(attsortkeyord) AS min_sort 
-							FROM pg_namespace AS n
-							INNER JOIN  pg_class AS c
-								ON n.oid = c.relnamespace
-							INNER JOIN pg_attribute AS a
-								ON c.oid = a.attrelid
-							WHERE c.relkind = 'r'
-								AND ABS(a.attsortkeyord) > 0
-								AND a.attnum > 0
-							GROUP BY tableowner, schemaname, tablename)
-					UNION
-					SELECT
+					(SELECT
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -255,9 +244,9 @@ SELECT
 						WHERE c.relkind = 'r'
 							AND ABS(a.attsortkeyord) > 0
 							AND a.attnum > 0
-						ORDER BY ABS(a.attsortkeyord)
+						ORDER BY ABS(a.attsortkeyord))
 					UNION
-					SELECT
+					(SELECT
 							c.relowner as tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -270,10 +259,9 @@ SELECT
 							ON c.oid = a.attrelid
 						WHERE c.relkind = 'r'
 							AND ABS(a.attsortkeyord) > 0
-							AND a.attnum > 0
-					--END SEMICOLON
+							AND a.attnum > 0)
 					UNION 
-					SELECT
+					(SELECT --END SEMICOLON
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
 							c.relname AS tablename,
@@ -282,23 +270,23 @@ SELECT
 						FROM  pg_namespace AS n
 						INNER JOIN pg_class AS c 
 							ON n.oid = c.relnamespace
-						WHERE c.relkind = 'r')
+						WHERE c.relkind = 'r'))
 			UNION (
 				SELECT
-					c.relowner AS tableowner,
-					'zzzzzzzz' || n.nspname AS schemaname,
-					'zzzzzzzz' || c.relname AS tablename,
-					700000000 + CAST(con.oid AS INT) AS seq,
-					'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
-				FROM pg_constraint AS con
-				INNER JOIN pg_class AS c
-					ON c.relnamespace = con.connamespace
-						AND c.oid = con.conrelid
-				INNER JOIN pg_namespace AS n
-					ON n.oid = c.relnamespace
-				WHERE c.relkind = 'r'
-					AND con.contype = 'f'
-				ORDER BY seq)
+						c.relowner AS tableowner,
+						'zzzzzzzz' || n.nspname AS schemaname,
+						'zzzzzzzz' || c.relname AS tablename,
+						700000000 + CAST(con.oid AS INT) AS seq,
+						'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
+					FROM pg_constraint AS con
+					INNER JOIN pg_class AS c
+						ON c.relnamespace = con.connamespace
+							AND c.oid = con.conrelid
+					INNER JOIN pg_namespace AS n
+						ON n.oid = c.relnamespace
+					WHERE c.relkind = 'r'
+						AND con.contype = 'f'
+					ORDER BY seq)
 			ORDER BY schemaname, tablename, seq) 
 		WHERE seq > 0
 			AND tableowner > 1);
