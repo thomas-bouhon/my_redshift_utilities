@@ -1,4 +1,4 @@
-SELECT 
+SELECT
 		schemaname || '.' || tablename AS tablename,
 		seq,
 		ddl
@@ -24,10 +24,10 @@ SELECT
 							0 AS seq,
 							'--DROP TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ';' AS ddl
 						FROM pg_namespace AS n
-						INNER JOIN pg_class AS c 
+						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
 						WHERE c.relkind = 'r')
-					UNION 
+					UNION
 					(SELECT --CREATE TABLE
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
@@ -38,7 +38,7 @@ SELECT
 						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
 						WHERE c.relkind = 'r')
-					UNION 
+					UNION
 					(SELECT --OPEN PAREN COLUMN LIST
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
@@ -49,7 +49,7 @@ SELECT
 						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
 						WHERE c.relkind = 'r')
-					UNION 
+					UNION
 					(SELECT --COLUMN LIST
 							tableowner,
 							schemaname,
@@ -64,7 +64,7 @@ SELECT
 									100000000 + a.attnum AS seq,
 									CASE
 											WHEN a.attnum > 1
-												THEN ',' 
+												THEN ','
 											ELSE ''
 										END AS col_delim,
 									QUOTE_IDENT(a.attname) AS col_name,
@@ -80,23 +80,23 @@ SELECT
 												THEN ''
 											ELSE 'ENCODE ' + format_encoding((a.attencodingtype)::integer)
 										END AS col_encoding,
-									CASE 
-											WHEN a.atthasdef IS TRUE 
-												THEN 'DEFAULT ' + adef.adsrc 
-											ELSE '' 
+									CASE
+											WHEN a.atthasdef IS TRUE
+												THEN 'DEFAULT ' + adef.adsrc
+											ELSE ''
 										END AS col_default,
 									CASE
-											WHEN a.attnotnull IS TRUE 
-												THEN 'NOT NULL' 
-											ELSE '' 
+											WHEN a.attnotnull IS TRUE
+												THEN 'NOT NULL'
+											ELSE ''
 										END AS col_nullable
 								FROM pg_namespace AS n
-								INNER JOIN pg_class AS c 
+								INNER JOIN pg_class AS c
 									ON n.oid = c.relnamespace
-								INNER JOIN pg_attribute AS a 
+								INNER JOIN pg_attribute AS a
 									ON c.oid = a.attrelid
-								LEFT OUTER JOIN pg_attrdef AS adef 
-									ON a.attrelid = adef.adrelid 
+								LEFT OUTER JOIN pg_attrdef AS adef
+									ON a.attrelid = adef.adrelid
 										AND a.attnum = adef.adnum
 								WHERE c.relkind = 'r'
 									AND a.attnum > 0
@@ -110,14 +110,14 @@ SELECT
 							'\t,' + pg_get_constraintdef(con.oid) AS ddl
 						FROM pg_constraint AS con
 						INNER JOIN pg_class AS c
-							ON c.relnamespace = con.connamespace 
+							ON c.relnamespace = con.connamespace
 								AND c.oid = con.conrelid
 						INNER JOIN pg_namespace AS n
 							ON n.oid = c.relnamespace
 						WHERE c.relkind = 'r'
 							AND pg_get_constraintdef(con.oid) NOT LIKE 'FOREIGN KEY%'
 						ORDER BY seq)
-					UNION 
+					UNION
 					(SELECT --CLOSE PAREN COLUMN LIST
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
@@ -143,10 +143,10 @@ SELECT
 									SPLIT_PART(key,'_',5) AS id
 								FROM pg_conf
 								WHERE key LIKE 'pg_class_backup_%'
-									AND SPLIT_PART(key,'_',4) = (SELECT oid FROM pg_database WHERE datname = current_database())) AS t 
+									AND SPLIT_PART(key,'_',4) = (SELECT oid FROM pg_database WHERE datname = current_database())) AS t
 							ON t.id=c.oid
 						WHERE c.relkind = 'r')
-					UNION 
+					UNION
 					(SELECT --BACKUP WARNING
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
@@ -161,7 +161,7 @@ SELECT
 									SPLIT_PART(key,'_',5) id
 								FROM pg_conf
 								WHERE key LIKE 'pg_class_backup_%'
-									AND SPLIT_PART(key,'_',4) = (SELECT oid FROM pg_database WHERE datname = current_database())) AS t 
+									AND SPLIT_PART(key,'_',4) = (SELECT oid FROM pg_database WHERE datname = current_database())) AS t
 							ON t.id=c.oid
 						WHERE c.relkind = 'r')
 					UNION
@@ -170,13 +170,15 @@ SELECT
 							n.nspname AS schemaname,
 							c.relname AS tablename,
 							300000001 AS seq,
-							CASE 
-									WHEN c.reldiststyle = 0 
+							CASE
+									WHEN c.reldiststyle = 0
 										THEN 'DISTSTYLE EVEN'
-									WHEN c.reldiststyle = 1 
+									WHEN c.reldiststyle = 1
 										THEN 'DISTSTYLE KEY'
-									WHEN c.reldiststyle = 8 
+									WHEN c.reldiststyle = 8
 										THEN 'DISTSTYLE ALL'
+									WHEN c.reldiststyle = 9
+										THEN 'DISTSTYLE AUTO'
 									ELSE '<<Error - UNKNOWN DISTSTYLE>>'
 								END AS ddl
 						FROM pg_namespace AS n
@@ -191,23 +193,23 @@ SELECT
 							400000000 + a.attnum AS seq,
 							'DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
 						FROM pg_namespace AS n
-						INNER JOIN pg_class AS c 
+						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
-						INNER JOIN pg_attribute AS a 
+						INNER JOIN pg_attribute AS a
 							ON c.oid = a.attrelid
 						WHERE c.relkind = 'r'
 							AND a.attisdistkey IS TRUE
 							AND a.attnum > 0)
 					UNION
-					(SELECT --SORTKEY COLUMNS 
+					(SELECT --SORTKEY COLUMNS
 							tableowner,
 							schemaname,
 							tablename,
 							seq,
-							CASE 
+							CASE
 									WHEN min_sort < 0
-										THEN 'INTERLEAVED SORTKEY (' 
-									ELSE 'SORTKEY (' 
+										THEN 'INTERLEAVED SORTKEY ('
+									ELSE 'SORTKEY ('
 								END AS ddl
 						FROM (
 							SELECT
@@ -215,7 +217,7 @@ SELECT
 									n.nspname AS schemaname,
 									c.relname AS tablename,
 									499999999 AS seq,
-									MIN(attsortkeyord) AS min_sort 
+									MIN(attsortkeyord) AS min_sort
 								FROM pg_namespace AS n
 								INNER JOIN  pg_class AS c
 									ON n.oid = c.relnamespace
@@ -260,7 +262,7 @@ SELECT
 						WHERE c.relkind = 'r'
 							AND ABS(a.attsortkeyord) > 0
 							AND a.attnum > 0)
-					UNION 
+					UNION
 					(SELECT --END SEMICOLON
 							c.relowner AS tableowner,
 							n.nspname AS schemaname,
@@ -268,7 +270,7 @@ SELECT
 							600000000 AS seq,
 							';' AS ddl
 						FROM  pg_namespace AS n
-						INNER JOIN pg_class AS c 
+						INNER JOIN pg_class AS c
 							ON n.oid = c.relnamespace
 						WHERE c.relkind = 'r'))
 			UNION (
@@ -287,6 +289,6 @@ SELECT
 					WHERE c.relkind = 'r'
 						AND con.contype = 'f'
 					ORDER BY seq)
-			ORDER BY schemaname, tablename, seq) 
+			ORDER BY schemaname, tablename, seq)
 		WHERE seq > 0
 			AND tableowner > 1);
